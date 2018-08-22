@@ -7,25 +7,25 @@ import os
 
 def index(args):
     """Indexes the given genome with the specified indexers."""
-    dr = os.path.dirname(args.path)
-    bn = os.path.basename(args.path)
+    dr = os.path.dirname(args.genome)
+    bn = os.path.basename(args.genome)
 
     if args.bwa:
         cmd = (
             f"sbatch --output=logs/{args.prefix}_bwa_index.log "
-            f"index_sbatch/bwa.sbatch {args.path}")
+            f"index_sbatch/bwa.sbatch {args.genome}")
         print(f"Creating job with command:\n\t{cmd}")
         print(subprocess.getoutput(cmd))
     if args.picard:
         cmd = (
             f"sbatch --output=logs/{args.prefix}_picard_index.log "
-            f"index_sbatch/picard.sbatch {args.path} {dr} {bn}")
+            f"index_sbatch/picard.sbatch {args.genome} {dr} {bn}")
         print(f"Creating job with command:\n\t{cmd}")
         print(subprocess.getoutput(cmd))
     if args.faidx:
         cmd = (
             f"sbatch --output=logs/{args.prefix}_faidx_index.log "
-            f"index_sbatch/faidx.sbatch {args.path}")
+            f"index_sbatch/faidx.sbatch {args.genome}")
         print(f"Creating job with command:\n\t{cmd}")
         print(subprocess.getoutput(cmd))
 
@@ -35,8 +35,8 @@ def index(args):
 def main():
     """Parse the command line arguments and pass on to indexing function."""
     parser = argparse.ArgumentParser(
-        description=('Performs the various steps needed to for a single pass '
-                     'genome genoem customization'))
+        description=('Performs the various indexing operations needed for a '
+                     'genome in the customization pipeline'))
     parser.add_argument('genome', help='The path to the genome')
     parser.add_argument(
         'prefix', help='Prefix to give to logs')
