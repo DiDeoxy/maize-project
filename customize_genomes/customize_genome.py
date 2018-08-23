@@ -6,7 +6,7 @@ from os import path, system
 import pathlib
 
 
-def parse():
+def parseCmdLine():
     """Parse the command line options."""
     parser = argparse.ArgumentParser(
         description=('Performs the various steps needed to for a single pass '
@@ -16,13 +16,13 @@ def parse():
     parser.add_argument(
         'vcf', help='The path to the genome\'s vcf file')
     parser.add_argument(
-        'prefix', help='Base name to give intermdiate files')
+        'prefix', help='Base name to give intermediate files')
     parser.add_argument(
         'new', help='Name to give new genome')
     parser.add_argument(
-        'reads_1', help='Path to read pair 1')
+        'reads_1', help='Path to read fasta pair 1')
     parser.add_argument(
-        'reads_2', help='Path to read pair 2')
+        'reads_2', help='Path to read fasta pair 2')
     parser.add_argument(
         'intermediate', help='Output directory for intermediate steps',
         default="scratch/maxh/intermediate/untreated_alignments")
@@ -49,10 +49,10 @@ def parse():
         '-r', '--base_recalibrate', help='Don\'t recalibrate the base scores of the aligned reads',
         action='store_false')
     parser.add_argument(
-        '-h', '--haplotype_caller', help='Don\'t use the haplotype caller to call variants',
+        '-c', '--caller_haplotype', help='Don\'t use the haplotype caller to call variants',
         action='store_false')
     parser.add_argument(
-        '-s', '--select_snps', help='Don\'t select SNPS from the haplotype caller vcf',
+        '-d', '--select_snps', help='Don\'t select SNPS from the haplotype caller vcf',
         action='store_false')
     parser.add_argument(
         '-i', '--select_indels', help='Don\'t select INDELS from the haplotype caller vcf',
@@ -66,108 +66,131 @@ def parse():
     return parser.parse_args()
 
 
-def customize(args):
+def customizeGenomePipeline(args):
     """Run the genome customization pipeline."""
     scriptDir = path.dirname(path.realpath(__file__))
 
-    intermediateOut = path.join(args.intermediate, args.prefix)
-    pathlib.Path(intermediateOut).mkdir(parents=True, exist_ok=True)
+    intermediateOutDir = path.join(args.intermediate, args.prefix)
+    pathlib.Path(intermediateOutDir).mkdir(parents=True, exist_ok=True)
+    intermediateOut = path.join(intermediateOutDir, args.prefix)
 
-    statsOut = path.join(args.intermediate, args.prefix, "stats")
-    pathlib.Path(statsOut).mkdir(parents=True, exist_ok=True)
+    statsOutDir = path.join(args.intermediate, args.prefix, "stats")
+    pathlib.Path(statsOutDir).mkdir(parents=True, exist_ok=True)
+    statsOut = path.join(statsOutDir, args.prefix)
 
     pathlib.Path(args.logs).mkdir(parents=True, exist_ok=True)
+    logs = path.join(args.logs, args.prefix)
 
-    variantsOut = path.join(args.results, args.prefix, "variants",)
-    pathlib.Path(variantsOut).mkdir(parents=True, exist_ok=True)
+    variantsOutDir = path.join(args.results, args.prefix, "variants")
+    pathlib.Path(variantsOutDir).mkdir(parents=True, exist_ok=True)
+    variantsOut = path.join(variantsOutDir, args.prefix)
 
-    resultsOut = path.join(args.results, args.prefix)
-    pathlib.Path(resultsOut).mkdir(parents=True, exist_ok=True)
+    resultsOutDir = path.join(args.results, args.prefix)
+    pathlib.Path(resultsOutDir).mkdir(parents=True, exist_ok=True)
+    resultsOut = path.join(resultsOutDir, args.new)
 
     prevJob = None
     if args.bwa:
         cmd = (
-            "sbatch --output=%s " % path.join(intermediateOut, f"{args.prefix}_bwa.sam") +
-            "--error=%s " % path.join(args.logs, f"{args.prefix}_bwa_align_err.log") +
+            f"sbatch --output={intermediateOut}_bwa.sam " +
+            f"--error={logs}_bwa_align_err.log " +
             path.join(scriptDir, "sbatch", "bwa_mem.sbatch") +
             f" {args.genome} {args.reads_1} {args.reads_2}")
-        print(f"Creating job with command:\n\t{cmd}")
-        submitted = subprocess.getoutput(cmd)
-        print(submitted)
-        prevJob = submitted.split(" ")[-1]
+        prevJob = submitJob(cmd)
     if args.sort_bam:
-        cmd = (
-            basicOut(prevJob, "sort_bam", args.logs, args.prefix, scriptDir) +
-            f" {intermediateOut}")
-        print(f"Creating job with command:\n\t{cmd}")
-        print(subprocess.getoutput(cmd))
+        prevJob = genericJob(args.bwa, prevJob, "sort_bam",
+                             logs, args.prefix, scriptDir, intermediateOut)
     if args.flagstat:
-        cmd = (
-            f"sbatch --dependency=afterany:{prevJob}" +
-            "--output=%s " % path.join(statsOut, f"{args.prefix}_alignment_metrics.txt") +
-            "--error=%s " % path.join(args.logs, f"{args.prefix}_flagstat_err.log") +
-            path.join(scriptDir, "sbatch", "flagstat.sbatch") +
-            f" {intermediateOut}")
-        print(f"Creating job with command:\n\t{cmd}")
-        print(subprocess.getoutput(cmd))
+        if args.sort_bam:
+            cmd = (
+                f"sbatch --dependency=afterany:{prevJob}" +
+                f"--output={statsOut}_alignment_metrics.txt " +
+                f"--error={logs}_flagsts_err.log " +
+                path.join(scriptDir, "sbatch", "flagstat.sbatch") +
+                intermediateOut)
+            prevJob = submitJob(cmd)
+        else:
+            cmd = (
+                f"sbatch " +
+                f"--output={statsOut}_alignment_metrics.txt " +
+                f"--error={logs}_flagsts_err.log " +
+                path.join(scriptDir, "sbatch", "flagstat.sbatch") +
+                intermediateOut)
+            prevJob = submitJob(cmd)
     if args.mark_duplicates:
-        cmd = (
-            basicOut(prevJob, "mark_duplicates", args.logs, args.prefix, scriptDir) +
-            f" {intermediateOut}")
-        print(f"Creating job with command:\n\t{cmd}")
-        print(subprocess.getoutput(cmd))
+        prevJob = genericJob(args.flagstat, prevJob, "mark_duplicates",
+                             logs, args.prefix, scriptDir, intermediateOut)
     if args.base_recalibrate:
-        cmd = (
-            basicOut(prevJob, "base_recalibrate", args.logs, args.prefix, scriptDir) +
-            f" {intermediateOut} {args.genome} {args.vcf}")
-        print(f"Creating job with command:\n\t{cmd}")
-        print(subprocess.getoutput(cmd))
-    if args.haplotype_caller:
-        cmd = (
-            basicOut(prevJob, "haplotype_caller", args.logs, args.prefix, scriptDir) +
-            f" {variantsOut} {args.genome}")
-        print(f"Creating job with command:\n\t{cmd}")
-        print(subprocess.getoutput(cmd))
+        prevJob = genericJob(args.mark_duplicates, prevJob,
+                             "base_recalibrate", logs, args.prefix, scriptDir,
+                             intermediateOut, args.genome, args.vcf)
+    if args.caller_haplotype:
+        prevJob = genericJob(args.base_recalibrate, prevJob,
+                             "caller_haplotype", logs, args.prefix, scriptDir,
+                             variantsOut, args.genome)
     if args.select_snps:
-        cmd = (
-            basicOut(prevJob, "select_snps", args.logs, args.prefix, scriptDir) +
-            f" {variantsOut} {args.genome}")
-        print(f"Creating job with command:\n\t{cmd}")
-        print(subprocess.getoutput(cmd))
+        prevJob = genericJob(args.caller_haplotype, prevJob,
+                             "select_snps", logs, args.prefix, scriptDir,
+                             variantsOut, args.genome)
     if args.select_indels:
-        cmd = (
-            basicOut(prevJob, "select_indels", args.logs, args.prefix, scriptDir) +
-            f" {variantsOut} {args.genome}")
-        print(f"Creating job with command:\n\t{cmd}")
-        print(subprocess.getoutput(cmd))
+        prevJob = genericJob(args.select_snps, prevJob,
+                             "select_indels", logs, args.prefix, scriptDir,
+                             variantsOut, args.genome)
     if args.filter_snps:
-        cmd = (
-            basicOut(prevJob, "filter_snps", args.logs, args.prefix, scriptDir) +
-            f" {variantsOut} {args.genome}")
-        print(f"Creating job with command:\n\t{cmd}")
-        print(subprocess.getoutput(cmd))
+        prevJob = genericJob(args.select_indels, prevJob,
+                             "filter_snps", logs, args.prefix, scriptDir,
+                             variantsOut, args.genome)
     if args.alternate_ref_make:
-        cmd = (
-            basicOut(prevJob, "alernate_ref_make", args.logs, args.prefix, scriptDir) +
-            f" {args.genome} {variantsOut}_snps.vcf " +
-            path.join(resultsOut, f"{args.new}"))
-        print(f"Creating job with command:\n\t{cmd}")
-        print(subprocess.getoutput(cmd))
+        prevJob = genericJob(args.filter_snps, prevJob,
+                             "alternate_ref_make", logs, args.prefix, scriptDir,
+                             args.genome, variantsOut, resultsOut)
 
     system("squeue -u maxh")
 
 
-def basicOut(prevJob, scriptName, logs, prefix, scriptDir):
-    """Produce the base of the cmds."""
+def basicOut(scriptName, logs, prefix, scriptDir):
+    """Produce the base of the cmds not depending on the previous job."""
+    return (f"sbatch " +
+            f"--output={logs}_{scriptName}_out.log " +
+            f"--error={logs}_{scriptName}_err.log " +
+            path.join(scriptDir, "sbatch", f"{scriptName}.sbatch")) + " "
+
+
+def basicOutPrev(prevJob, scriptName, logs, prefix, scriptDir):
+    """Produce the base of the cmds depending on the previous job."""
     return (f"sbatch --dependency=afterany:{prevJob}" +
-            "--output=%s " % path.join(logs, f"{prefix}_{scriptName}_out.log") +
-            "--error=%s " % path.join(logs, f"{prefix}_{scriptName}_err.log") +
-            path.join(scriptDir, "sbatch", f"{scriptName}.sbatch"))
+            f"--output={logs}_{scriptName}_out.log " +
+            f"--error={logs}_{scriptName}_err.log " +
+            path.join(scriptDir, "sbatch", f"{scriptName}.sbatch")) + " "
+
+
+def submitJob(cmd):
+    """Submit the job, print the output, return job number."""
+    print(f"Creating job with command:\n\t{cmd}")
+    submitted = subprocess.getoutput(cmd)
+    print(submitted)
+    return submitted.split(" ")[-1]
+
+
+def genericJob(prevTask, prevJob, scriptName, logs, prefix, scriptDir, *args):
+    """Template for job cmds."""
+    cmd = ""
+    if prevTask:
+        cmd = (
+            basicOutPrev(prevJob, scriptName, logs, prefix, scriptDir) +
+            " " + " ".join(args)
+        )
+    else:
+        cmd = (
+            basicOut(scriptName, logs, prefix, scriptDir) +
+            " " + " ".join(args)
+        )
+    return submitJob(cmd)
 
 
 def main():
     """Intiaties the logic of the program."""
-    customize(parse())
+    customizeGenomePipeline(parseCmdLine())
 
 
 if __name__ == "__main__":

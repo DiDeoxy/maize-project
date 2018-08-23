@@ -12,5 +12,5 @@
 
 java -jar $GATK -T FastaAlternateReferenceMaker \
    -R $1 \
-   -V $2 \
+   -V $2_snps.vcf \
    -o $3.fasta
