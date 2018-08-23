@@ -12,5 +12,4 @@
 bwa mem -t 16 \
     -R '@RG\tID:M1\tSM:EF09B\tLB:lib1\tPL:illumina\tPU:unit1' \
     -M $1 \
-    untreated_trimmed/EF09B_R1_val_1.fq.gz \
-    untreated_trimmed/EF09B_R2_val_2.fq.gz
+    $2 $3
