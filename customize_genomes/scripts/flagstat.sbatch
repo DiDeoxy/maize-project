@@ -8,4 +8,5 @@
 
 # $1 is path to output directory + file prefix
 
-samtools flagstat $1_sorted.bam 
+samtools flagstat $1_sorted.bam
+report

@@ -7,3 +7,4 @@
 #SBATCH --time=0-00:05
 
 samtools faidx $1
+report

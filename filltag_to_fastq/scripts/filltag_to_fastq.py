@@ -4,6 +4,15 @@ import argparse
 import os
 import pathlib
 import subprocess
+import contextlib
+import re
+
+
+def silentremove(*filenames):
+    """Delete file if it exists."""
+    with contextlib.suppress(FileNotFoundError):
+        for filename in filenames:
+            os.remove(filename)
 
 
 def formatReadsAndCompress(args):
@@ -11,21 +20,34 @@ def formatReadsAndCompress(args):
     pathlib.Path(args.out).mkdir(parents=True, exist_ok=True)
     r1 = os.path.join(args.out, f"{args.prefix}_R1.fq")
     r2 = os.path.join(args.out, f"{args.prefix}_R2.fq")
-    with open(args.filltag, 'r') as filltag, \
-            open(r1, 'a') as read1, \
-            open(r2, 'a') as read2:
-        count = 1
-        for line in filltag:
-            line.rstrip()
-            reads = line.split(" ")
-            if ((not reads[0].startswith("#")) and (len(reads) > 4)):
-                read1.write(
-                    f"@ID:{args.prefix}.{count}\n{reads[3]}\n+\n{reads[1]}\n")
-                read2.write(
-                    f"@ID:{args.prefix}.{count}\n{reads[4]}\n+\n{reads[2]}\n")
-                count += 1
-    subprocess.run(f"pigz -p 16 {r1}")
-    subprocess.run(f"pigz -p 16 {r2}")
+    up = os.path.join(args.out, f"{args.prefix}_unpaired.fq")
+    # silentremove(r1, r2, up)
+    # with open(args.filltag, 'r') as filltag, \
+    #         open(r1, 'a') as read1, \
+    #         open(r2, 'a') as read2, \
+    #         open(up, 'a') as unpaired:
+    #     filltag.readline()
+    #     filltag.readline()
+    #     count = 1
+    #     for line in filltag:
+    #         line.rstrip()
+    #         reads = re.compile(r"\s+").split(line)
+    #         count += 1
+    #         if (len(reads) == 4):
+    #             unpaired.write(
+    #                 f"@ID:{args.prefix}.{count}\n{reads[2]}\n+\n{reads[1]}\n")
+    #         else:
+    #             read1.write(
+    #                 f"@ID:{args.prefix}.{count}\n{reads[3]}\n+\n{reads[1]}\n")
+    #             read2.write(
+    #                 f"@ID:{args.prefix}.{count}\n{reads[4]}\n+\n{reads[2]}\n")
+    #         count += 1
+
+    subprocess.run(["pigz", "-p", "16", args.filltag])
+    # subprocess.run(["pigz", "-p", "16", r1])
+    # subprocess.run(["pigz", "-p", "16", r2])
+    # subprocess.run(["pigz", "-p", "16", up])
+    silentremove(r1, r2, up, args.filltag)
 
 
 def main():

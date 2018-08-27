@@ -116,16 +116,18 @@ def customizeGenomePipeline(args):
         cmd = (f"sbatch " +
                f"--output={intermediateOut}_bwa.sam " +
                f"--error={logs}_bwa_align_err.log " +
+               f"--job-name={args.prefix}_bwa_align" +
                os.path.join(scriptDir, "bwa_mem.sbatch") +
                f" {args.genome} {args.reads1} {args.reads2}")
         prevJob = jobs.submitJob(cmd)
     prevJob = jobs.genericJob(prevJob, args.sort_bam, "sort_bam",
-                              logs, scriptDir,
+                              logs, scriptDir, args.prefix,
                               intermediateOut)
     if prevJob and args.flagstat:
         cmd = (f"sbatch --dependency=afterany:{prevJob}" +
                f"--output={statsOut}_alignment_metrics.txt " +
                f"--error={logs}_flagstats_err.log " +
+               f"--job-name={args.prefix}_flagstat" +
                os.path.join(scriptDir, "flagstat.sbatch") +
                intermediateOut)
         prevJob = jobs.submitJob(cmd)
@@ -133,27 +135,33 @@ def customizeGenomePipeline(args):
         cmd = (f"sbatch " +
                f"--output={statsOut}_alignment_metrics.txt " +
                f"--error={logs}_flagstats_err.log " +
+               f"--job-name={args.prefix}_flagstat" +
                os.path.join(scriptDir, "flagstat.sbatch") +
                intermediateOut)
         prevJob = jobs.submitJob(cmd)
     prevJob = jobs.genericJob(prevJob, args.mark_duplicates,
-                              "mark_duplicates", logs, scriptDir,
+                              "mark_duplicates", logs, scriptDir, args.prefix,
                               intermediateOut)
     prevJob = jobs.genericJob(prevJob, args.base_recalibrate,
                               "base_recalibrator", logs, scriptDir,
-                              intermediateOut, args.genome, args.vcf)
+                              args.prefix, intermediateOut, args.genome,
+                              args.vcf)
     prevJob = jobs.genericJob(prevJob, args.caller_haplotype,
                               "haplotype_caller", logs, scriptDir,
-                              variantsOut, args.genome)
+                              args.prefix, variantsOut, args.genome)
     prevJob = jobs.genericJob(prevJob, args.select_snps, "select_snps",
-                              logs, scriptDir, variantsOut, args.genome)
+                              logs, scriptDir, args.prefix, variantsOut,
+                              args.genome)
     prevJob = jobs.genericJob(prevJob, args.select_indels, "select_indels",
-                              logs, scriptDir, variantsOut, args.genome)
+                              logs, scriptDir, args.prefix, variantsOut,
+                              args.genome)
     prevJob = jobs.genericJob(prevJob, args.filter_snps, "filter_snps",
-                              logs, scriptDir, variantsOut, args.genome)
+                              logs, scriptDir, args.prefix, variantsOut,
+                              args.genome)
     prevJob = jobs.genericJob(prevJob, args.alternate_ref_make,
                               "make_alternate_ref", logs, scriptDir,
-                              args.genome, variantsOut, resultsOut)
+                              args.prefix, args.genome, variantsOut,
+                              resultsOut)
 
     subprocess.run("squeue -u maxh")
 

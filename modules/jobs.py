@@ -6,25 +6,27 @@ import pathlib
 
 
 def baseDirs(logs, prefix, path):
-    """Create the logs and script dirs."""
+    """Create the logs (for the given prefix) and script dirs."""
     pathlib.Path(logs).mkdir(parents=True, exist_ok=True)
     return (os.path.join(logs, prefix),
-            (os.path.join(os.path.dirname(os.path.dirname(path)), "scripts")))
+            (os.path.join(os.path.dirname(path))))
 
 
-def basicOut(scriptName, logs, scriptDir):
+def basicOut(scriptName, logs, scriptDir, prefix):
     """Produce the base of the cmds not depending on the previous job."""
     return (f"sbatch " +
             f"--output={logs}_{scriptName}_out.log " +
             f"--error={logs}_{scriptName}_err.log " +
+            f"--job-name={prefix}_{scriptName}" +
             os.path.join(scriptDir, f"{scriptName}.sbatch") + " ")
 
 
-def basicOutPrev(prevJob, scriptName, logs, scriptDir):
+def basicOutPrev(prevJob, scriptName, logs, scriptDir, prefix):
     """Produce the base of the cmds depending on the previous job."""
     return (f"sbatch --dependency=afterany:{prevJob}" +
             f"--output={logs}_{scriptName}_out.log " +
             f"--error={logs}_{scriptName}_err.log " +
+            f"--job-name={prefix}_{scriptName}" +
             os.path.join(scriptDir, f"{scriptName}.sbatch") + " ")
 
 
@@ -36,14 +38,14 @@ def submitJob(cmd):
     return submitted.split(" ")[-1]
 
 
-def genericJob(prevJob, job, scriptName, logs, scriptDir, *args):
+def genericJob(prevJob, job, scriptName, logs, scriptDir, prefix, *args):
     """Template for job cmds."""
     cmd = ""
     if prevJob and job:
-        cmd = (basicOutPrev(prevJob, scriptName, logs, scriptDir) +
+        cmd = (basicOutPrev(prevJob, scriptName, logs, scriptDir, prefix) +
                " " + " ".join(args))
     elif job:
-        cmd = (basicOut(scriptName, logs, scriptDir) +
+        cmd = (basicOut(scriptName, logs, scriptDir, prefix) +
                " " + " ".join(args))
     else:
         return prevJob

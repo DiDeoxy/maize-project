@@ -14,3 +14,4 @@ java -jar $EBROOTPICARD/picard.jar MarkDuplicates \
     M=$1_marked_dups_metrics.txt \
     CREATE_INDEX=true
 rm $1_sorted.bam $1_sorted.bai
+report

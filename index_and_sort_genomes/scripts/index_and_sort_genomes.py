@@ -15,13 +15,13 @@ def index(args):
     vcf = args.vcf.split(".")
 
     prevJob = jobs.genericJob(0, args.bwa_index, "bwa_index", logs, scriptDir,
-                              args.genome)
+                              args.prefix, args.genome)
     prevJob = jobs.genericJob(prevJob, args.picard, "picard_index", logs,
-                              scriptDir, args.genome)
+                              scriptDir, args.prefix, args.genome)
     prevJob = jobs.genericJob(prevJob, args.faidx, "faidx", logs, scriptDir,
-                              args.genome)
+                              args.prefix, args.genome)
     prevJob = jobs.genericJob(prevJob, args.sort_vcf, "sort_vcf", logs,
-                              scriptDir, args.vcf,
+                              scriptDir, args.prefix, args.vcf,
                               (vcf[0] + '_sorted.' + vcf[1]), args.genome,
                               (vcf[0] + '_sorted_updated.' + vcf[1]))
 

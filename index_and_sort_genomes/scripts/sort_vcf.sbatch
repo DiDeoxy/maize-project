@@ -20,3 +20,4 @@ java -jar $EBROOTPICARD/picard.jar UpdateVcfSequenceDictionary \
     O=$4 \
     SEQUENCE_DICTIONARY=$3
 rm $2
+report

@@ -3,7 +3,7 @@
 #SBATCH --nodes=1 
 #SBATCH --ntasks=1 
 #SBATCH --cpus-per-task=16
-#SBATCH --mem-per-cpu=30000M
+#SBATCH --mem-per-cpu=3000M
 #SBATCH --time=0-02:00
 
 # $1 is path to output directory + file prefix
@@ -15,3 +15,4 @@ java -jar $GATK -T SelectVariants \
     -selectType SNP \
     -o $1_snps.vcf \
     -select "vc.getGenotype(\"${1}\").isHomVar()"  ## only works interactively
+report

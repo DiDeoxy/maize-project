@@ -7,3 +7,4 @@
 #SBATCH --time=0-00:20
 
 gunzip $1
+report

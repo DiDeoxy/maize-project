@@ -18,3 +18,4 @@ java -jar $GATK -T VariantFiltration \
     --filterExpression 'QD < 2.0 || FS > 60.0 || MQ < 40.0 || ReadPosRankSum < -8.0 || SOR > 4.0' \
     --filterName "basic_snp_filter" \
     -o variants/$1_snps_filtered.vcf
+report

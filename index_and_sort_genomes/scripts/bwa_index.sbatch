@@ -7,3 +7,4 @@
 #SBATCH --time=0-01:00
 
 bwa index $1
+report

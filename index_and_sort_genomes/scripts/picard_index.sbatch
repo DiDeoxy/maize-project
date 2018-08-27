@@ -10,3 +10,4 @@
 
 java -jar $EBROOTPICARD/picard.jar CreateSequenceDictionary \
     REFERENCE=$1 OUTPUT=$1.dict
+report

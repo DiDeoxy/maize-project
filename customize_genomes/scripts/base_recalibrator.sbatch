@@ -3,7 +3,7 @@
 #SBATCH --nodes=1 
 #SBATCH --ntasks=1 
 #SBATCH --cpus-per-task=16
-#SBATCH --mem-per-cpu=40000M
+#SBATCH --mem-per-cpu=4000M
 #SBATCH --time=0-03:00
 
 # $1 is path to output directory + file prefix
@@ -16,3 +16,4 @@ java -jar $GATK -T BaseRecalibrator \
     -R $2 \
     -knownSites $3 \
     -o $1_recal.table
+report

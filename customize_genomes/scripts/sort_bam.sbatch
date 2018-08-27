@@ -13,4 +13,5 @@ java -jar $EBROOTPICARD/picard.jar SortSam \
 	OUTPUT=$1_sorted.bam \
 	SORT_ORDER=coordinate \
 	CREATE_INDEX=true
-rm $1.sam 
+rm $1.sam
+report
