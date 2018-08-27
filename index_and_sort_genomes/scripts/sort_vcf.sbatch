@@ -11,6 +11,7 @@
 # $3 is reference genome
 # $4 is output sorted vcf file with updated dict
 
+module load picard/2.18.9
 java -jar $EBROOTPICARD/picard.jar SortVcf \
     I=$1 \
     O=$2 \

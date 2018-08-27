@@ -9,6 +9,7 @@
 # $1 is input reads
 # $2 is output reads
 
+module load trimmomatic/0.36
 java -jar $EBROOTTRIMMOMATIC/trimmomatic-0.36.jar \
     -threads 16
     SE \

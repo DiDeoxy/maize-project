@@ -10,6 +10,7 @@
 # $2 is genome path
 # $3 is sorted vcf
 
+module load gatk/4.0.0.0
 java -jar $GATK -T BaseRecalibrator \
     -nct 16 \
     -I $1_marked.bam \

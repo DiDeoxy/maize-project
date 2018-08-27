@@ -6,13 +6,14 @@
 #SBATCH --mem-per-cpu=1000M
 #SBATCH --time=0-03:00
 
-# $1 is read 1
-# $2 is read 2
-# $3 is output paired read 1
-# $4 is output unpaired read 1
-# $5 is output paired read 2
-# $6 is output unpaired read 2
+# $1 is forward
+# $2 is reverse
+# $3 is output paired forward
+# $4 is output unpaired forward
+# $5 is output paired reverse
+# $6 is output unpaired reverse
 
+module load trimmomatic/0.36
 java -jar $EBROOTTRIMMOMATIC/trimmomatic-0.36.jar \
     -threads 16
     PE \

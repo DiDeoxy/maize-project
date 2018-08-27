@@ -9,6 +9,7 @@
 # $1 is path to genome
 # $2 and $3 are paths to paired end reads
 
+module load bwa/0.7.17
 bwa mem -t 16 \
     -R '@RG\tID:M1\tSM:EF09B\tLB:lib1\tPL:illumina\tPU:unit1' \
     -M $1 \

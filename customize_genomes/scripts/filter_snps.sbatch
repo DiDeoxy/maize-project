@@ -9,6 +9,7 @@
 # $1 is path to output directory + file prefix
 # $2 is genome path
 
+module load gatk/4.0.0.0
 java -jar $GATK -T VariantFiltration \
     -R $2 \
     -V $1_snps.vcf \

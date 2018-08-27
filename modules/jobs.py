@@ -5,29 +5,41 @@ import subprocess
 import pathlib
 
 
-def baseDirs(logs, prefix, path):
-    """Create the logs (for the given prefix) and script dirs."""
+def baseDirs(logs, sample, path):
+    """Create the logs (for the given sample) and script dirs."""
     pathlib.Path(logs).mkdir(parents=True, exist_ok=True)
-    return (os.path.join(logs, prefix),
+    return (os.path.join(logs, sample),
             (os.path.join(os.path.dirname(path))))
 
 
-def basicOut(scriptName, logs, scriptDir, prefix):
+def out(prevJob, scriptName, logs, scriptDir, sample, optional):
     """Produce the base of the cmds not depending on the previous job."""
-    return (f"sbatch " +
-            f"--output={logs}_{scriptName}_out.log " +
-            f"--error={logs}_{scriptName}_err.log " +
-            f"--job-name={prefix}_{scriptName}" +
-            os.path.join(scriptDir, f"{scriptName}.sbatch") + " ")
-
-
-def basicOutPrev(prevJob, scriptName, logs, scriptDir, prefix):
-    """Produce the base of the cmds depending on the previous job."""
-    return (f"sbatch --dependency=afterany:{prevJob}" +
-            f"--output={logs}_{scriptName}_out.log " +
-            f"--error={logs}_{scriptName}_err.log " +
-            f"--job-name={prefix}_{scriptName}" +
-            os.path.join(scriptDir, f"{scriptName}.sbatch") + " ")
+    if prevJob and optional:
+        return ("sbatch --dependency=afterany:%s" % ":".join(prevJob) +
+                f"--output={logs}_{scriptName}_out.log " +
+                f"--error={logs}_{scriptName}_err.log " +
+                f"--job-name={sample}_{scriptName} " +
+                f"{optional} " +
+                os.path.join(scriptDir, f"{scriptName}") + " ")
+    elif prevJob:
+        return ("sbatch --dependency=afterany:%s" % ":".join(prevJob) +
+                f"--output={logs}_{scriptName}_out.log " +
+                f"--error={logs}_{scriptName}_err.log " +
+                f"--job-name={sample}_{scriptName} " +
+                os.path.join(scriptDir, f"{scriptName}") + " ")
+    elif optional:
+        return (f"sbatch " +
+                f"--output={logs}_{scriptName}_out.log " +
+                f"--error={logs}_{scriptName}_err.log " +
+                f"--job-name={sample}_{scriptName} " +
+                f"{optional} " +
+                os.path.join(scriptDir, f"{scriptName}") + " ")
+    else:
+        return (f"sbatch " +
+                f"--output={logs}_{scriptName}_out.log " +
+                f"--error={logs}_{scriptName}_err.log " +
+                f"--job-name={sample}_{scriptName} " +
+                os.path.join(scriptDir, f"{scriptName}") + " ")
 
 
 def submitJob(cmd):
@@ -38,14 +50,17 @@ def submitJob(cmd):
     return submitted.split(" ")[-1]
 
 
-def genericJob(prevJob, job, scriptName, logs, scriptDir, prefix, *args):
+def job(prevJob, job, scriptName, logs, scriptDir, sample,
+        optional, *args):
     """Template for job cmds."""
+    # print(" ".join(args))
     cmd = ""
     if prevJob and job:
-        cmd = (basicOutPrev(prevJob, scriptName, logs, scriptDir, prefix) +
-               " " + " ".join(args))
+        cmd = (out(
+            prevJob, scriptName, logs, scriptDir, sample, optional) +
+            " " + " ".join(args))
     elif job:
-        cmd = (basicOut(scriptName, logs, scriptDir, prefix) +
+        cmd = (out(0, scriptName, logs, scriptDir, sample, optional) +
                " " + " ".join(args))
     else:
         return prevJob

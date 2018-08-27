@@ -103,11 +103,11 @@ def customizeGenomePipeline(args):
     pathlib.Path(resultsOutDir).mkdir(parents=True, exist_ok=True)
     resultsOut = os.path.join(resultsOutDir, args.new)
 
-    variantsOutDir = os.path.join(resultsOutDir, "variants")
+    variantsOutDir = os.path.join(resultsOutDir, "variants.sbatch")
     pathlib.Path(variantsOutDir).mkdir(parents=True, exist_ok=True)
     variantsOut = os.path.join(variantsOutDir, args.prefix)
 
-    statsOutDir = os.path.join(resultsOutDir, "stats")
+    statsOutDir = os.path.join(resultsOutDir, "stats.sbatch")
     pathlib.Path(statsOutDir).mkdir(parents=True, exist_ok=True)
     statsOut = os.path.join(statsOutDir, args.prefix)
 
@@ -140,26 +140,26 @@ def customizeGenomePipeline(args):
                intermediateOut)
         prevJob = jobs.submitJob(cmd)
     prevJob = jobs.genericJob(prevJob, args.mark_duplicates,
-                              "mark_duplicates", logs, scriptDir, args.prefix,
+                              "mark_duplicates.sbatch", logs, scriptDir, args.prefix,
                               intermediateOut)
     prevJob = jobs.genericJob(prevJob, args.base_recalibrate,
-                              "base_recalibrator", logs, scriptDir,
+                              "base_recalibrator.sbatch", logs, scriptDir,
                               args.prefix, intermediateOut, args.genome,
                               args.vcf)
     prevJob = jobs.genericJob(prevJob, args.caller_haplotype,
-                              "haplotype_caller", logs, scriptDir,
+                              "haplotype_caller.sbatch", logs, scriptDir,
                               args.prefix, variantsOut, args.genome)
-    prevJob = jobs.genericJob(prevJob, args.select_snps, "select_snps",
+    prevJob = jobs.genericJob(prevJob, args.select_snps, "select_snps.sbatch",
                               logs, scriptDir, args.prefix, variantsOut,
                               args.genome)
-    prevJob = jobs.genericJob(prevJob, args.select_indels, "select_indels",
+    prevJob = jobs.genericJob(prevJob, args.select_indels, "select_indels.sbatch",
                               logs, scriptDir, args.prefix, variantsOut,
                               args.genome)
-    prevJob = jobs.genericJob(prevJob, args.filter_snps, "filter_snps",
+    prevJob = jobs.genericJob(prevJob, args.filter_snps, "filter_snps.sbatch",
                               logs, scriptDir, args.prefix, variantsOut,
                               args.genome)
     prevJob = jobs.genericJob(prevJob, args.alternate_ref_make,
-                              "make_alternate_ref", logs, scriptDir,
+                              "make_alternate_ref.sbatch", logs, scriptDir,
                               args.prefix, args.genome, variantsOut,
                               resultsOut)
 

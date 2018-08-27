@@ -8,6 +8,7 @@
 
 # $1 is path to output directory + file prefix
 
+module load gatk/4.0.0.0
 java -jar $GATK -T SelectVariants \
     -nt 16 \
     -R $2 \

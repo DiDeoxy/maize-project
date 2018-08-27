@@ -8,6 +8,7 @@
 
 # $1 is path to output directory + file prefix
 
+module load picard/2.18.9
 java -jar $EBROOTPICARD/picard.jar MarkDuplicates \
     I=$1_sorted.bam \
     O=$1_marked.bam \

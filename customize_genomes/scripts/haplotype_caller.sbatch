@@ -9,6 +9,7 @@
 # $1 is path to output directory + file prefix
 # $2 is genome path
 
+module load gatk/4.0.0.0
 java -jar $GATK -T HaplotypeCaller \
     -nct 16 \
     -I $1_marked.bam \

@@ -8,6 +8,7 @@
 
 # $1 is the reference genome
 
+module load picard/2.18.9
 java -jar $EBROOTPICARD/picard.jar CreateSequenceDictionary \
     REFERENCE=$1 OUTPUT=$1.dict
 report

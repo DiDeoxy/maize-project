@@ -8,5 +8,6 @@
 
 # $1 is path to output directory + file prefix
 
+module load samtools/1.9
 samtools flagstat $1_sorted.bam
 report

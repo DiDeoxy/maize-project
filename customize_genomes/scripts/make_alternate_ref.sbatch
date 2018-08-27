@@ -10,6 +10,7 @@
 # $2 is snps
 # $3 is the new reference extension
 
+module load gatk/4.0.0.0
 java -jar $GATK -T FastaAlternateReferenceMaker \
    -R $1 \
    -V $2_snps.vcf \
