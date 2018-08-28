@@ -12,56 +12,50 @@ def baseDirs(logs, sample, path):
             (os.path.join(os.path.dirname(path))))
 
 
-def out(prevJob, scriptName, logs, scriptDir, sample, optional):
+def out(prevJob, logs, task, scriptName, scriptDir, sample, optional):
     """Produce the base of the cmds not depending on the previous job."""
+    same = (f"--output={logs}_{task}_out.log "
+            f"--error={logs}_{task}_err.log "
+            f"--job-name={sample}_{task} ")
     if prevJob and optional:
         return ("sbatch --dependency=afterany:%s" % ":".join(prevJob) +
-                f"--output={logs}_{scriptName}_out.log " +
-                f"--error={logs}_{scriptName}_err.log " +
-                f"--job-name={sample}_{scriptName} " +
+                same +
                 f"{optional} " +
                 os.path.join(scriptDir, f"{scriptName}") + " ")
     elif prevJob:
         return ("sbatch --dependency=afterany:%s" % ":".join(prevJob) +
-                f"--output={logs}_{scriptName}_out.log " +
-                f"--error={logs}_{scriptName}_err.log " +
-                f"--job-name={sample}_{scriptName} " +
+                same +
                 os.path.join(scriptDir, f"{scriptName}") + " ")
     elif optional:
         return (f"sbatch " +
-                f"--output={logs}_{scriptName}_out.log " +
-                f"--error={logs}_{scriptName}_err.log " +
-                f"--job-name={sample}_{scriptName} " +
+                same +
                 f"{optional} " +
                 os.path.join(scriptDir, f"{scriptName}") + " ")
     else:
         return (f"sbatch " +
-                f"--output={logs}_{scriptName}_out.log " +
-                f"--error={logs}_{scriptName}_err.log " +
-                f"--job-name={sample}_{scriptName} " +
+                same +
                 os.path.join(scriptDir, f"{scriptName}") + " ")
 
 
 def submitJob(cmd):
     """Submit the job, print the output, return job number."""
-    print(f"Creating job with command:\n\t{cmd}")
+    print(f"Creating job with command:\n\n{cmd}\n")
     submitted = subprocess.getoutput(cmd)
     print(submitted)
     return submitted.split(" ")[-1]
 
 
-def job(prevJob, job, scriptName, logs, scriptDir, sample,
-        optional, *args):
+def job(prevJob, job, logs, task, scriptName, scriptDir, sample,
+        optional, *files):
     """Template for job cmds."""
-    # print(" ".join(args))
     cmd = ""
     if prevJob and job:
         cmd = (out(
-            prevJob, scriptName, logs, scriptDir, sample, optional) +
-            " " + " ".join(args))
+            prevJob, logs, task, scriptName, scriptDir, sample, optional) +
+            " " + " ".join(files))
     elif job:
-        cmd = (out(0, scriptName, logs, scriptDir, sample, optional) +
-               " " + " ".join(args))
+        cmd = (out(0, logs, task, scriptName, scriptDir, sample, optional) +
+               " " + " ".join(files))
     else:
         return prevJob
 

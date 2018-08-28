@@ -6,31 +6,30 @@ import subprocess
 import os
 import pathlib
 import itertools
+import tempfile
 import jobs
 
-# need to make sample name automatic and perform fastqc on each sample
-# separately so i can output to seeparate log directories
 
-
-def parseCmdLine():
-    """Parse the command line arguments."""
-    parser = argparse.ArgumentParser(
-        description=('Optionally runs fastqc on raw fastq reads, trims them '
-                     'with trimmomatic, and runs fastqc on the trimmed '
-                     'reads. Expects reads to by gzipped ending in fq.gz.'))
+def baseParser(parser):
+    """Parse common arguments."""
     parser.add_argument(
         'kind',
-        help='The kind of reads [untreated/bisulfite/etc.].')
-    parser.add_argument(
-        'sample',
-        help='The sample name.')
+        help='The kind of reads [WGS/bisulfite/untreated/etc.].')
     parser.add_argument(
         'logs',
-        help=('Logs output base directory. Logs will be placed in a '
-              'subdirectory with the given sample as its name.'),
+        help=('Logs output base directory. Defaults to a directory called '
+              'logs in the same directory as the script. Creates '
+              'subdirectories based on sample names extracted from file name '
+              'using --separator.'),
         nargs='?',
-        default=os.path.join(os.path.dirname(os.path.dirname(
-            os.path.realpath(__file__))), "logs"))
+        default=os.path.join(os.path.dirname(
+            os.path.realpath(__file__)), "logs"))
+    parser.add_argument(
+        '-s', '--separator',
+        help='The symbol separting the sample name in the file names from '
+        'the rest of the name. Defuault: underscore, \"_\"',
+        nargs="?",
+        default='_')
     parser.add_argument(
         '-q', '--fastqc_raw',
         help=('Perform fastqc on raw reads.'),
@@ -55,54 +54,145 @@ def parseCmdLine():
               'to be trimmed. Files will be placed in a subdirectory with '
               'the given sample as its name.'),
         required=('-t' in sys.argv or '--trim' in sys.argv))
-    parser.add_argument(
-        '-d', "--dir",
-        help=('A directory containing [forward, reverse, and/or unpaired] '
-              'fastq files. Required if -forward, -reverse, and -r are not '
-              'set'),
-        required=not ((('-f' in sys.argv or '--forward' in sys.argv) and
-                       ('-r' in sys.argv or '--reverse' in sys.argv)) or
-                      ('-u' in sys.argv or '--unpaired' in sys.argv)))
-    parser.add_argument(
+    return parser
+
+
+def parseCmdLine():
+    """Parse the command line arguments."""
+    parser = argparse.ArgumentParser(
+        description=('Optionally runs fastqc on raw fastq reads, trims them '
+                     'with trimmomatic, and runs fastqc on the trimmed '
+                     'reads. Expects reads to by gzipped ending in fq.gz.'))
+
+    subparsers = parser.add_subparsers(help='sub-command [-h, --help]',
+                                       dest="command")
+    parserDir = subparsers.add_parser(
+        'DIR',
+        help=('Run program in directory mode. Performs operations on '
+              'compressed fastq files in a directory.'))
+    parserDir = baseParser(parserDir)
+    parserDir.add_argument(
+        'dir',
+        help=('The directory containing the compressed fastq files. Expects '
+              'extension .fq.gz'))
+    parserDir.add_argument(
         '-e', '--ends',
-        help=('If -d or --dir is used use this to indicate whether '
-              'forward, reverse, and unpaired reads are present [1], only '
-              'forward and reverse reads are present [2], or only unpaired '
-              'reads are present [3].'),
+        help=('Indicate whether forward, reverse, and unpaired reads are '
+              'present [1], only forward and reverse reads are present [2], '
+              'or only unpaired reads are present [3].'),
         type=int,
-        choices=[1, 2, 3],
-        required=('-d' in sys.argv or '--dir' in sys.argv))
-    parser.add_argument(
+        choices=[1, 2, 3])
+    parserFiles = subparsers.add_parser(
+        'FILES',
+        help=('Run program in file mode. Performs operations on supplied '
+              'forward, reverse, and unpaired reads if supplied.'))
+    parserFiles = baseParser(parserFiles)
+    parserFiles.add_argument(
         '-f', '--forward',
         help=('Paths to one or more raw or trimmed forward reads. Assumes in '
-              'same order as -r and -u if used. Required if -d and -u are not '
-              'used.'),
+              'same order as -r and -u if used. Required if -r is used.'),
         action='append',
-        required=(not ('-d' in sys.argv or '--dir' in sys.argv) or
-                  ('-r' in sys.argv or '--reverse' in sys.argv)))
-    parser.add_argument(
+        required=('-r' in sys.argv or '--reverse' in sys.argv))
+    parserFiles.add_argument(
         '-r', '--reverse',
         help=('Paths to one or more raw or trimmed reverse reads. Assumes in '
-              'same order as -f and -u if used. Required if -d and -u are '
-              'not used.'),
+              'same order as -f and -u if used. Required if -f is used.'),
         action='append',
-        required=(not ('-d' in sys.argv or '--dir' in sys.argv) or
-                  ('-f' in sys.argv or '--forward' in sys.argv)))
-    parser.add_argument(
+        required=('-f' in sys.argv or '--forward' in sys.argv))
+    parserFiles.add_argument(
         '-u', '--unpaired',
         help=('Paths to one or more raw or trimmed unpaired reads. Assumes '
-              'in same order as -f and -r if used, if not reads are '
+              'in same order as -f and -r if used. Otherwise reads are '
               'processed as single end.'),
-        action=('append'),
-        required=not(('-d' in sys.argv or '--dir' in sys.argv) and
-                     ('-f' in sys.argv or '--forward' in sys.argv) and
-                     ('-r' in sys.argv or '--reverse' in sys.argv)))
+        action=('append'))
+
     args = parser.parse_args()
     if args.fastqc_raw is None and args.trim is None and \
             args.fastqc_trimmed is None:
         parser.error('At least one of --fastqc_raw, --trim, '
                      '--fastqc_trimmed is requried.')
+
     return args
+
+
+def fastqcScript():
+    """Return the fastqc script text."""
+    return """\
+#!/usr/bin/bash
+
+# SBATCH --nodes=1
+# SBATCH --ntasks=1
+# SBATCH --cpus-per-task=1
+# SBATCH --mem-per-cpu=1000M
+# SBATCH --time=0-00:20
+
+# $1 is output directory of untreated fastqc reports
+# $2 is untreated fasta file or files
+
+module load fastqc/0.11.5
+fastqc --noextract -o "$@"
+report"""
+
+
+def trimPEScript():
+    """Return the fastqc script text."""
+    return """\
+#!/usr/bin/bash
+
+# SBATCH --nodes=1
+# SBATCH --ntasks=1
+# SBATCH --cpus-per-task=16
+# SBATCH --mem-per-cpu=1000M
+# SBATCH --time=0-03:00
+
+# $1 is forward
+# $2 is reverse
+# $3 is output paired forward
+# $4 is output unpaired forward
+# $5 is output paired reverse
+# $6 is output unpaired reverse
+
+module load trimmomatic/0.36
+java -jar $EBROOTTRIMMOMATIC/trimmomatic-0.36.jar \
+    -threads 16
+    PE \
+    $1 $2 \
+    $3 $4 \
+    $5 $6 \
+    # ILLUMINACLIP:<find out>(fastqc?) \
+    LEADING:3 \
+    TRAILING:3 \
+    SLIDINGWINDOW:4:15 \
+    MINLEN:36
+report"""
+
+
+def trimSEScript():
+    """Return the fastqc script text."""
+    return """\
+#!/usr/bin/bash
+
+# SBATCH --nodes=1
+# SBATCH --ntasks=1
+# SBATCH --cpus-per-task=16
+# SBATCH --mem-per-cpu=1000M
+# SBATCH --time=0-03:00
+
+# $1 is input reads
+# $2 is output reads
+
+module load trimmomatic/0.36
+java -jar $EBROOTTRIMMOMATIC/trimmomatic-0.36.jar \
+    -threads 16
+    SE \
+    $1 \
+    $2 \
+    # ILLUMINACLIP:<find out>(fastqc?) \
+    LEADING:3 \
+    TRAILING:3 \
+    SLIDINGWINDOW:4:15 \
+    MINLEN:36
+report"""
 
 
 def fourTrimOut(trim, forward, reverse):
@@ -115,96 +205,121 @@ def fourTrimOut(trim, forward, reverse):
             f"{os.path.join(trim, sampleR)}_unpaired_trimmed.fq.gz")
 
 
-def trimPE(args, prevJob, logs, scriptDir, forward, reverse):
+def trimPE(args, prevJob, logs, scriptDir, trimDir, sample, forward, reverse):
     """Trim paired-end fastq files."""
-    pf, uf, pr, ur = fourTrimOut(args.trim_out, forward, reverse)
-    prevJobPE = jobs.job(prevJob, args.trim, "trim_pe.sbatch", logs,
-                         scriptDir, args.sample, 0, forward,
-                         reverse, pf, uf, pr, ur)
+    pf, uf, pr, ur = fourTrimOut(trimDir, forward, reverse)
+    tpe = tempScript(trimPEScript())
+    prevJobPE = jobs.job(prevJob, args.trim, logs, "trim_PE", tpe.name,
+                         scriptDir, sample, 0, forward, reverse, pf, uf,
+                         pr, ur)
+    os.unlink(tpe.name)
     return (prevJobPE, pf, uf, pr, ur)
 
 
-def trimSE(args, prevJob, logs, scriptDir, unpaired):
+def trimSE(args, prevJob, logs, scriptDir, trimDir, sample, unpaired):
     """Trim single-end fastq files."""
-    sePre = os.path.join(args.trim_out, unpaired.split('.fq.gz')[0])
+    sePre = os.path.join(trimDir, unpaired.split('.fq.gz')[0])
     se = f"{sePre}_trimmed.fq.gz"
-    prevJobSE = jobs.job(prevJob, args.trim, "trim_se.sbatch", logs,
-                         scriptDir, args.sample, 0, unpaired, se)
+    tse = tempScript(trimSEScript())
+    prevJobSE = jobs.job(prevJob, args.trim, logs, "trim_SE", tse.name,
+                         scriptDir, sample, 0, unpaired, se)
+    os.unlink(tse.name)
     return (prevJobSE, se)
 
 
-def fastqcTrimFastqc(args):
-    """Run fastq and trimmomatic appropriately depending on options."""
-    logs, scriptDir = jobs.baseDirs(args.logs, args.sample,
-                                    os.path.realpath(__file__))
+def trim(args, prevJob, logs, scriptDir, sample, *reads):
+    """Trim fastq files."""
+    trimDir = outDir(args.trim_out, f"{args.kind}_reads", f"{sample}_trimmed")
+    if len(reads) == 3:
+        prevJobPE, pf, uf, pr, ur = trimPE(
+            args, prevJob, logs, scriptDir, trimDir, sample, reads[0],
+            reads[1])
+        prevJobSE, se = trimSE(
+            args, prevJob, logs, scriptDir, trimDir, sample, reads[2])
+        return (prevJobPE, prevJobSE), (pf, uf, pr, ur, se)
+    elif len(reads) == 2:
+        prevJobPE, pf, uf, pr, ur = trimPE(
+            args, prevJob, logs, scriptDir, trimDir, sample, reads[0],
+            reads[1])
+        return prevJobPE, (pf, uf, pr, ur)
+    else:
+        prevJobSE, se = trimSE(
+            args, prevJob, logs, scriptDir, trimDir, sample, reads)
 
+
+def tempScript(script):
+    """Write a string as a temp bash file."""
+    scriptfile = tempfile.NamedTemporaryFile(delete=False, mode='w')
+    scriptfile.write(script)
+    scriptfile.close()
+    return scriptfile
+
+
+def outDir(*components):
+    """Create a directory path and make it if it doesnt exist."""
+    od = os.path.join(*components)
+    pathlib.Path(od).mkdir(parents=True, exist_ok=True)
+    return od
+
+
+def fastqc(args, prevJob, logs, scriptDir, sample, state, *fastqs):
+    """Perform fastqc on the given reads."""
+    fastqcRawOutDir = outDir(
+        args.fastqc_out, f"{args.kind}_{state}", f"{sample}_{state}")
+    fqc = tempScript(fastqcScript())
+    prevJob = jobs.job(
+        prevJob, args.fastqc_raw, logs, f"fastqc_{state}", fqc.name,
+        scriptDir, sample, 0, fastqcRawOutDir, *fastqs)
+    os.unlink(fqc.name)
+    return prevJob
+
+
+def fastqcTrimFastqc(args, fastqs, n):
+    """Fastqc and trim appropriately."""
+    for i in range(0, len(fastqs), n):
+        sample = os.path.basename(fastqs[i]).split(args.separator)[0]
+        logs, scriptDir = jobs.baseDirs(args.logs, sample,
+                                        os.path.realpath(__file__))
+        if args.fastqc_raw:
+            prevJob = fastqc(args, 0, logs, scriptDir, sample, "raw",
+                             *fastqs[i:i+n])
+        if args.trim:
+            prevJob, trimmed = trim(args, prevJob, logs, scriptDir,
+                                    sample, *fastqs[i:i+n])
+            if args.fastqc_trimmed:
+                prevJob = fastqc(args, prevJob, logs, scriptDir, sample,
+                                 "trimmed", *trimmed)
+        elif args.fastqc_trimmed:
+            fastqc(args, prevJob, logs, scriptDir, sample, "trimmed",
+                   *fastqs[i:i+n])
+
+
+def pipeline(args):
+    """Run fastq and trimmomatic appropriately depending on options."""
     fastqs = []
-    if args.dir:
+    if args.command == "DIR":
         fastqs = [file_ for file_ in os.listdir(
             args.dir) if file_.endswith(".fq.gz")]
     elif args.forward and args.reverse and args.unpaired:
         fastqs = list(itertools.chain(
             *zip(args.forward, args.reverse, args.unpaired)))
-    elif args.forwards and args.reverese:
+    elif args.forward and args.reverse:
         fastqs = list(itertools.chain(*zip(args.forward, args.reverse)))
     else:
         fastqs = args.unpaired
 
-    if args.fastqc_raw:
-        fastqcRawOutDir = os.path.join(
-            args.fastqc_out, os.path.join(
-                f"raw_{args.kind}", f"{args.sample}_raw"))
-        pathlib.Path(fastqcRawOutDir).mkdir(parents=True, exist_ok=True)
-        prevJob = jobs.job(
-            0, args.fastqc_raw, "fastqc.sbatch", logs, scriptDir, args.sample,
-            f"--cpus-per-task={len(fastqs) // 2}", fastqcRawOutDir,
-            " ".join(fastqs))
-
-    if args.trim and args.fastqc_trimmed:
-        fastqcTrimmedOutDir = os.path.join(
-            args.fastqc_out, os.path.join(
-                f"trimmed_{args.kind}", f"{args.sample}_trimmed"))
-        pathlib.Path(fastqcTrimmedOutDir).mkdir(parents=True, exist_ok=True)
-        trimmed = []
-        prevJob2 = []
-        if args.ends == 1 or \
-                (args.forward and args.reverse and args.unpaired):
-            for i in range(0, len(fastqs), 3):
-                prevJobPE, pf, uf, pr, ur = trimPE(
-                    args, prevJob, logs, scriptDir, fastqs[i],
-                    fastqs[i+1])
-                prevJobSE, se = trimSE(
-                    args, prevJob, logs, scriptDir, fastqs[i+2])
-                trimmed = [pf, uf, pr, ur, se]
-                prevJob2 = (prevJobSE, prevJobPE)
-        elif args.ends == 2 or (args.forward and args.reverse):
-            for i in range(0, len(fastqs), 2):
-                prevJob2, *trimmed = trimPE(
-                    args, prevJob, logs, scriptDir, fastqs[i],
-                    fastqs[i+1])
-        else:
-            for i in range(len(fastqs)):
-                prevJob2, trimmed = trimSE(
-                    args, prevJob, logs, scriptDir, fastqs[i])
-
-        jobs.job(
-            prevJob2, args.fastqc_trimmed, "fastqc.sbatch", logs,
-            scriptDir, args.sample, f"--cpus-per-task={len(fastqs) // 2}",
-            fastqcTrimmedOutDir, " ".join(trimmed))
-    elif args.fastqc_trimmed:
-        fastqcTrimmedOutDir = os.path.join(
-            args.fastqc_out, os.path.join(
-                f"trimmed_{args.kind}", f"{args.sample}_trimmed"))
-        pathlib.Path(fastqcTrimmedOutDir).mkdir(parents=True, exist_ok=True)
-        jobs.job(
-            prevJob2, args.fastqc_trimmed, "fastqc.sbatch", logs,
-            scriptDir, args.sample, f"--cpus-per-task={len(fastqs) // 2}",
-            fastqcTrimmedOutDir, " ".join(fastqs))
+    if (args.command == "DIR" and args.ends == 1) or \
+            (args.forward and args.reverse and args.unpaired):
+        fastqcTrimFastqc(args, fastqs, 3)
+    elif args.ends == 2 or (args.forward and args.reverse):
+        fastqcTrimFastqc(args, fastqs, 2)
+    else:
+        fastqcTrimFastqc(args, fastqs, 1)
 
 
 def main():
     """Parse cmd line arguments and pass to functions."""
-    fastqcTrimFastqc(parseCmdLine())
+    pipeline(parseCmdLine())
 
 
 if __name__ == "__main__":
