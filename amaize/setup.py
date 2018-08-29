@@ -1,11 +1,13 @@
-from setuptools import setup
+"""Turn the modules scripts into real modules."""
+
+from setuptools import setup, find_packages
 
 setup(
-    name='modules',
+    name='amaize',
     version='0.0.1',
     description='maize-project modules',
     license='MIT',
-    packages=['modules'],
+    packages=find_packages(),
     author='Max Hargreaves',
     author_email='whargrea@uoguelph.ca',
     keywords=['na'],

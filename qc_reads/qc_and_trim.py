@@ -3,11 +3,9 @@
 import argparse
 import itertools
 import os
-import pathlib
 import sys
-import tempfile
 
-from modules import jobs, sbatch
+from amaize import jobs, sbatch
 
 
 def baseParser(parser):
@@ -128,7 +126,7 @@ def fourTrimOut(trim, forward, reverse):
 def trimPE(args, prevJob, logs, scriptDir, trimDir, sample, forward, reverse):
     """Trim paired-end fastq files."""
     pf, uf, pr, ur = fourTrimOut(trimDir, forward, reverse)
-    tpe = tempScript(sbatch.trimPEScript())
+    tpe = jobs.tempScript(sbatch.trimPEScript())
     prevJobPE = jobs.job(prevJob, args.trim, logs, "trim_PE", tpe.name,
                          scriptDir, sample, 0, forward, reverse, pf, uf,
                          pr, ur)
@@ -140,7 +138,7 @@ def trimSE(args, prevJob, logs, scriptDir, trimDir, sample, unpaired):
     """Trim single-end fastq files."""
     sePre = os.path.join(trimDir, unpaired.split('.fq.gz')[0])
     se = f"{sePre}_trimmed.fq.gz"
-    tse = tempScript(sbatch.trimSEScript())
+    tse = jobs.tempScript(sbatch.trimSEScript())
     prevJobSE = jobs.job(prevJob, args.trim, logs, "trim_SE", tse.name,
                          scriptDir, sample, 0, unpaired, se)
     os.unlink(tse.name)
@@ -149,7 +147,8 @@ def trimSE(args, prevJob, logs, scriptDir, trimDir, sample, unpaired):
 
 def trim(args, prevJob, logs, scriptDir, sample, *reads):
     """Trim fastq files."""
-    trimDir = outDir(args.trim_out, f"{args.kind}_reads", f"{sample}_trimmed")
+    trimDir = jobs.outDir(args.trim_out, f"{args.kind}_reads",
+                          f"{sample}_trimmed")
     if len(reads) == 3:
         prevJobPE, pf, uf, pr, ur = trimPE(
             args, prevJob, logs, scriptDir, trimDir, sample, reads[0],
@@ -167,26 +166,11 @@ def trim(args, prevJob, logs, scriptDir, sample, *reads):
             args, prevJob, logs, scriptDir, trimDir, sample, reads)
 
 
-def tempScript(script):
-    """Write a string as a temp bash file."""
-    scriptfile = tempfile.NamedTemporaryFile(delete=False, mode='w')
-    scriptfile.write(script)
-    scriptfile.close()
-    return scriptfile
-
-
-def outDir(*components):
-    """Create a directory path and make it if it doesnt exist."""
-    od = os.path.join(*components)
-    pathlib.Path(od).mkdir(parents=True, exist_ok=True)
-    return od
-
-
 def fastqc(args, prevJob, logs, scriptDir, sample, state, *fastqs):
     """Perform fastqc on the given reads."""
-    fastqcRawOutDir = outDir(
+    fastqcRawOutDir = jobs.outDir(
         args.fastqc_out, f"{args.kind}_{state}", f"{sample}_{state}")
-    fqc = tempScript(sbatch.fastqcScript())
+    fqc = jobs.tempScript(sbatch.fastqcScript())
     prevJob = jobs.job(
         prevJob, args.fastqc_raw, logs, f"fastqc_{state}", fqc.name,
         scriptDir, sample, 0, fastqcRawOutDir, *fastqs)

@@ -3,6 +3,7 @@
 import os
 import subprocess
 import pathlib
+import tempfile
 
 
 def baseDirs(logs, sample, path):
@@ -60,3 +61,18 @@ def job(prevJob, job, logs, task, scriptName, scriptDir, sample,
         return prevJob
 
     return submitJob(cmd)
+
+
+def tempScript(script):
+    """Write a string as a temp bash file."""
+    scriptfile = tempfile.NamedTemporaryFile(delete=False, mode='w')
+    scriptfile.write(script)
+    scriptfile.close()
+    return scriptfile
+
+
+def outDir(*components):
+    """Create a directory path and make it if it doesnt exist."""
+    od = os.path.join(*components)
+    pathlib.Path(od).mkdir(parents=True, exist_ok=True)
+    return od
