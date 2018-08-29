@@ -1,3 +1,6 @@
+"""sbatch scripts."""
+
+
 def fastqcScript():
     """Return the fastqc script text."""
     return """\
@@ -7,7 +10,7 @@ def fastqcScript():
 # SBATCH --ntasks=1
 # SBATCH --cpus-per-task=1
 # SBATCH --mem-per-cpu=1000M
-# SBATCH --time=0-00:20
+# SBATCH --time=0-01:30
 
 # $1 is output directory of untreated fastqc reports
 # $2 is untreated fasta file or files
