@@ -1,13 +1,13 @@
 """Runs fastqc and trimmomatic jobs."""
 
-import sys
 import argparse
-import subprocess
+import itertools
 import os
 import pathlib
-import itertools
+import sys
 import tempfile
-import jobs
+
+from modules import jobs, sbatch
 
 
 def baseParser(parser):
@@ -115,86 +115,6 @@ def parseCmdLine():
     return args
 
 
-def fastqcScript():
-    """Return the fastqc script text."""
-    return """\
-#!/usr/bin/bash
-
-# SBATCH --nodes=1
-# SBATCH --ntasks=1
-# SBATCH --cpus-per-task=1
-# SBATCH --mem-per-cpu=1000M
-# SBATCH --time=0-00:20
-
-# $1 is output directory of untreated fastqc reports
-# $2 is untreated fasta file or files
-
-module load fastqc/0.11.5
-fastqc --noextract -o "$@"
-report"""
-
-
-def trimPEScript():
-    """Return the fastqc script text."""
-    return """\
-#!/usr/bin/bash
-
-# SBATCH --nodes=1
-# SBATCH --ntasks=1
-# SBATCH --cpus-per-task=16
-# SBATCH --mem-per-cpu=1000M
-# SBATCH --time=0-03:00
-
-# $1 is forward
-# $2 is reverse
-# $3 is output paired forward
-# $4 is output unpaired forward
-# $5 is output paired reverse
-# $6 is output unpaired reverse
-
-module load trimmomatic/0.36
-java -jar $EBROOTTRIMMOMATIC/trimmomatic-0.36.jar \
-    -threads 16
-    PE \
-    $1 $2 \
-    $3 $4 \
-    $5 $6 \
-    # ILLUMINACLIP:<find out>(fastqc?) \
-    LEADING:3 \
-    TRAILING:3 \
-    SLIDINGWINDOW:4:15 \
-    MINLEN:36
-report"""
-
-
-def trimSEScript():
-    """Return the fastqc script text."""
-    return """\
-#!/usr/bin/bash
-
-# SBATCH --nodes=1
-# SBATCH --ntasks=1
-# SBATCH --cpus-per-task=16
-# SBATCH --mem-per-cpu=1000M
-# SBATCH --time=0-03:00
-
-# $1 is input reads
-# $2 is output reads
-
-module load trimmomatic/0.36
-java -jar $EBROOTTRIMMOMATIC/trimmomatic-0.36.jar \
-    -threads 16
-    SE \
-    $1 \
-    $2 \
-    # ILLUMINACLIP:<find out>(fastqc?) \
-    LEADING:3 \
-    TRAILING:3 \
-    SLIDINGWINDOW:4:15 \
-    MINLEN:36
-report"""
-
-
 def fourTrimOut(trim, forward, reverse):
     """Create the four output file names for trimmomatic."""
     sampleF = forward.split(".fq.gz")[0]
@@ -208,7 +128,7 @@ def fourTrimOut(trim, forward, reverse):
 def trimPE(args, prevJob, logs, scriptDir, trimDir, sample, forward, reverse):
     """Trim paired-end fastq files."""
     pf, uf, pr, ur = fourTrimOut(trimDir, forward, reverse)
-    tpe = tempScript(trimPEScript())
+    tpe = tempScript(sbatch.trimPEScript())
     prevJobPE = jobs.job(prevJob, args.trim, logs, "trim_PE", tpe.name,
                          scriptDir, sample, 0, forward, reverse, pf, uf,
                          pr, ur)
@@ -220,7 +140,7 @@ def trimSE(args, prevJob, logs, scriptDir, trimDir, sample, unpaired):
     """Trim single-end fastq files."""
     sePre = os.path.join(trimDir, unpaired.split('.fq.gz')[0])
     se = f"{sePre}_trimmed.fq.gz"
-    tse = tempScript(trimSEScript())
+    tse = tempScript(sbatch.trimSEScript())
     prevJobSE = jobs.job(prevJob, args.trim, logs, "trim_SE", tse.name,
                          scriptDir, sample, 0, unpaired, se)
     os.unlink(tse.name)
@@ -266,7 +186,7 @@ def fastqc(args, prevJob, logs, scriptDir, sample, state, *fastqs):
     """Perform fastqc on the given reads."""
     fastqcRawOutDir = outDir(
         args.fastqc_out, f"{args.kind}_{state}", f"{sample}_{state}")
-    fqc = tempScript(fastqcScript())
+    fqc = tempScript(sbatch.fastqcScript())
     prevJob = jobs.job(
         prevJob, args.fastqc_raw, logs, f"fastqc_{state}", fqc.name,
         scriptDir, sample, 0, fastqcRawOutDir, *fastqs)
