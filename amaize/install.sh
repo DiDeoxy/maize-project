@@ -1,2 +1,1 @@
-python setup.py sdist bdist_wheel
-pip install dist/*.tar.gz
+pip install -e .
