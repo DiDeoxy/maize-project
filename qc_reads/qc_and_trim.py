@@ -20,8 +20,8 @@ def baseParser(parser):
               'subdirectories based on sample names extracted from file name '
               'using --separator.'),
         nargs='?',
-        default=os.path.join(os.path.dirname(
-            os.path.realpath(__file__)), "logs"))
+        default=os.path.join(os.path.dirname(os.path.realpath(__file__)),
+                             "logs"))
     parser.add_argument(
         '-s', '--separator',
         help='The symbol separting the sample name in the file names from '
@@ -113,67 +113,61 @@ def parseCmdLine():
     return args
 
 
-def fourTrimOut(trim, forward, reverse):
+def fourTrimOut(trimDir, forward, reverse):
     """Create the four output file names for trimmomatic."""
     sampleF = forward.split(".fq.gz")[0]
     sampleR = reverse.split(".fq.gz")[0]
-    return (f"{os.path.join(trim, sampleF)}_paired_trimmed.fq.gz",
-            f"{os.path.join(trim, sampleF)}_unpaired_trimmed.fq.gz",
-            f"{os.path.join(trim, sampleR)}_paired_trimmed.fq.gz",
-            f"{os.path.join(trim, sampleR)}_unpaired_trimmed.fq.gz")
+    return (os.path.join(trimDir, f"{sampleF}_paired_trimmed.fq.gz"),
+            os.path.join(trimDir, f"{sampleF}_unpaired_trimmed.fq.gz"),
+            os.path.join(trimDir, f"{sampleR}_paired_trimmed.fq.gz"),
+            os.path.join(trimDir, f"{sampleR}_unpaired_trimmed.fq.gz"))
 
 
-def trimPE(args, prevJob, logs, scriptDir, trimDir, sample, forward, reverse):
+def trimPE(args, prevJob, logs, trimDir, sample, forward, reverse):
     """Trim paired-end fastq files."""
     pf, uf, pr, ur = fourTrimOut(trimDir, forward, reverse)
     tpe = jobs.tempScript(sbatch.trimPEScript())
-    prevJobPE = jobs.job(prevJob, args.trim, logs, "trim_PE", tpe.name,
-                         scriptDir, sample, 0, forward, reverse, pf, uf,
-                         pr, ur)
+    prevJobPE = jobs.job(prevJob, args.trim, logs, "trim_PE", tpe.name, sample,
+                         0, forward, reverse, pf, uf, pr, ur)
     os.unlink(tpe.name)
     return (prevJobPE, pf, uf, pr, ur)
 
 
-def trimSE(args, prevJob, logs, scriptDir, trimDir, sample, unpaired):
+def trimSE(args, prevJob, logs, trimDir, sample, unpaired):
     """Trim single-end fastq files."""
-    sePre = os.path.join(trimDir, unpaired.split('.fq.gz')[0])
-    se = f"{sePre}_trimmed.fq.gz"
+    se = os.path.join(trimDir, f"{unpaired.split('.fq.gz')[0]}_trimmed.fq.gz")
     tse = jobs.tempScript(sbatch.trimSEScript())
-    prevJobSE = jobs.job(prevJob, args.trim, logs, "trim_SE", tse.name,
-                         scriptDir, sample, 0, unpaired, se)
+    prevJobSE = jobs.job(prevJob, args.trim, logs, "trim_SE", tse.name, sample,
+                         0, unpaired, se)
     os.unlink(tse.name)
     return (prevJobSE, se)
 
 
-def trim(args, prevJob, logs, scriptDir, sample, *reads):
+def trim(args, prevJob, outDir, sample, *reads):
     """Trim fastq files."""
-    trimDir = jobs.outDir(args.trim_out, f"{args.kind}_reads",
-                          f"{sample}_trimmed")
+    trimDir = jobs.outDir(args.trim_out, outDir)
+    logs = jobs.outDir(args.logs, outDir)
     if len(reads) == 3:
         prevJobPE, pf, uf, pr, ur = trimPE(
-            args, prevJob, logs, scriptDir, trimDir, sample, reads[0],
-            reads[1])
-        prevJobSE, se = trimSE(
-            args, prevJob, logs, scriptDir, trimDir, sample, reads[2])
+            args, prevJob, logs, trimDir, sample, reads[0], reads[1])
+        prevJobSE, se = trimSE(args, prevJob, logs, trimDir, sample, reads[2])
         return (prevJobPE, prevJobSE), (pf, uf, pr, ur, se)
     elif len(reads) == 2:
         prevJobPE, pf, uf, pr, ur = trimPE(
-            args, prevJob, logs, scriptDir, trimDir, sample, reads[0],
-            reads[1])
+            args, prevJob, logs, trimDir, sample, reads[0], reads[1])
         return prevJobPE, (pf, uf, pr, ur)
     else:
-        prevJobSE, se = trimSE(
-            args, prevJob, logs, scriptDir, trimDir, sample, reads)
+        prevJobSE, se = trimSE(args, prevJob, logs, trimDir, sample, reads)
 
 
-def fastqc(args, prevJob, logs, scriptDir, sample, state, *fastqs):
+def fastqc(args, prevJob, outDir, sample, state, *fastqs):
     """Perform fastqc on the given reads."""
-    fastqcRawOutDir = jobs.outDir(
-        args.fastqc_out, f"{args.kind}_{state}", f"{sample}_{state}")
+    fastqcRawOutDir = jobs.outDir(args.fastqc_out, outDir)
+    logs = jobs.outDir(args.logs, outDir)
     fqc = jobs.tempScript(sbatch.fastqcScript())
     prevJob = jobs.job(
-        prevJob, args.fastqc_raw, logs, f"fastqc_{state}", fqc.name,
-        scriptDir, sample, 0, fastqcRawOutDir, *fastqs)
+        prevJob, args.fastqc_raw, logs, f"fastqc_{state}", fqc.name, sample, 0,
+        fastqcRawOutDir, *fastqs)
     os.unlink(fqc.name)
     return prevJob
 
@@ -182,20 +176,17 @@ def fastqcTrimFastqc(args, fastqs, n):
     """Fastqc and trim appropriately."""
     for i in range(0, len(fastqs), n):
         sample = os.path.basename(fastqs[i]).split(args.separator)[0]
-        logs, scriptDir = jobs.baseDirs(args.logs, sample,
-                                        os.path.realpath(__file__))
+        outDir = os.path.join(args.kind, sample)
         if args.fastqc_raw:
-            prevJob = fastqc(args, 0, logs, scriptDir, sample, "raw",
-                             *fastqs[i:i+n])
+            prevJob = fastqc(args, 0, outDir, sample, "raw", *fastqs[i:i+n])
         if args.trim:
-            prevJob, trimmed = trim(args, prevJob, logs, scriptDir,
-                                    sample, *fastqs[i:i+n])
+            prevJob, trimmed = trim(args, prevJob, outDir, sample,
+                                    *fastqs[i:i+n])
             if args.fastqc_trimmed:
-                prevJob = fastqc(args, prevJob, logs, scriptDir, sample,
-                                 "trimmed", *trimmed)
+                prevJob = fastqc(args, prevJob, outDir, sample, "trimmed",
+                                 *trimmed)
         elif args.fastqc_trimmed:
-            fastqc(args, prevJob, logs, scriptDir, sample, "trimmed",
-                   *fastqs[i:i+n])
+            fastqc(args, prevJob, outDir, sample, "trimmed", *fastqs[i:i+n])
 
 
 def pipeline(args):

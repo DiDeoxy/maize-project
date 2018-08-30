@@ -4,7 +4,7 @@ kind=untreated
 
 for sample in `cat samples.txt`; 
 do
-    python scripts/qc_and_trim.py FILES \
+    python qc_and_trim.py FILES \
         $kind \
         --fastqc_raw \
         --fastqc_out /scratch/maxh/results/fastqc_reports/ \

@@ -6,36 +6,22 @@ import pathlib
 import tempfile
 
 
-def baseDirs(logs, sample, path):
-    """Create the logs (for the given sample) and script dirs."""
-    pathlib.Path(logs).mkdir(parents=True, exist_ok=True)
-    return (os.path.join(logs, sample),
-            (os.path.join(os.path.dirname(path))))
-
-
-def out(prevJob, logs, task, scriptName, scriptDir, sample, optional):
+def out(prevJob, logs, task, scriptName, sample, optional):
     """Produce the base of the cmds not depending on the previous job."""
-    same = (f"--output={logs}_{task}_out.log "
-            f"--error={logs}_{task}_err.log "
-            f"--job-name={sample}_{task} ")
+    same = (f"--output=%s " % os.path.join(logs, f"{sample}_{task}_out.log") +
+            f"--error=%s " % os.path.join(logs, f"{sample}_{task}_err.log") +
+            f"--job-name={sample}_{task} "
+            "%s" + scriptName)
     if prevJob and optional:
         return ("sbatch --dependency=afterany:%s" % ":".join(prevJob) +
-                same +
-                f"{optional} " +
-                os.path.join(scriptDir, f"{scriptName}") + " ")
+                same % optional)
     elif prevJob:
         return ("sbatch --dependency=afterany:%s" % ":".join(prevJob) +
-                same +
-                os.path.join(scriptDir, f"{scriptName}") + " ")
+                same % "")
     elif optional:
-        return (f"sbatch " +
-                same +
-                f"{optional} " +
-                os.path.join(scriptDir, f"{scriptName}") + " ")
+        return (f"sbatch " + same % optional)
     else:
-        return (f"sbatch " +
-                same +
-                os.path.join(scriptDir, f"{scriptName}") + " ")
+        return (f"sbatch " + same % "")
 
 
 def submitJob(cmd):
@@ -46,16 +32,15 @@ def submitJob(cmd):
     return submitted.split(" ")[-1]
 
 
-def job(prevJob, job, logs, task, scriptName, scriptDir, sample,
-        optional, *files):
+def job(prevJob, job, logs, task, scriptName, sample, optional, *files):
     """Template for job cmds."""
     cmd = ""
     if prevJob and job:
         cmd = (out(
-            prevJob, logs, task, scriptName, scriptDir, sample, optional) +
+            prevJob, logs, task, scriptName, sample, optional) +
             " " + " ".join(files))
     elif job:
-        cmd = (out(0, logs, task, scriptName, scriptDir, sample, optional) +
+        cmd = (out(0, logs, task, scriptName, sample, optional) +
                " " + " ".join(files))
     else:
         return prevJob
