@@ -13,10 +13,12 @@ def out(prevJob, logs, task, scriptName, sample, optional):
             f"--job-name={sample}_{task} "
             "%s" + scriptName)
     if prevJob and optional:
-        return ("sbatch --dependency=afterany:%s" % ":".join(prevJob) +
+        return ("sbatch --dependency=afterany:%s" %
+                ":".join(prevJob) if len(prevJob) > 1 else prevJob +
                 same % optional)
     elif prevJob:
-        return ("sbatch --dependency=afterany:%s" % ":".join(prevJob) +
+        return ("sbatch --dependency=afterany:%s" %
+                ":".join(prevJob) if len(prevJob) > 1 else prevJob +
                 same % "")
     elif optional:
         return (f"sbatch " + same % optional)
