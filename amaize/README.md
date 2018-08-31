@@ -1,1 +1,1 @@
-Contains functions for my maize-project
+Contains functions for maize-project
