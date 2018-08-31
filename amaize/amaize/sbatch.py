@@ -17,7 +17,8 @@ def fastqcScript():
 
 module load fastqc/0.11.5
 fastqc -t 3 --noextract -o "$@"
-sacct -j $SLURM_JOB_ID.batch --format=JobName,JobID,TimeLimit,Elapsed,Start,End,CPUTime,MaxVMSize,MaxRSS,AveRSS
+source .bashrc
+sreport
 """
 
 
@@ -51,7 +52,8 @@ java -jar $EBROOTTRIMMOMATIC/trimmomatic-0.36.jar \
     TRAILING:3 \
     SLIDINGWINDOW:4:15 \
     MINLEN:36
-sacct -j $SLURM_JOB_ID.batch --format=JobName,JobID,TimeLimit,Elapsed,Start,End,CPUTime,MaxVMSize,MaxRSS,AveRSS
+source .bashrc
+sreport
 """
 
 
@@ -80,7 +82,8 @@ java -jar $EBROOTTRIMMOMATIC/trimmomatic-0.36.jar \
     TRAILING:3 \
     SLIDINGWINDOW:4:15 \
     MINLEN:36
-sacct -j $SLURM_JOB_ID.batch --format=JobName,JobID,TimeLimit,Elapsed,Start,End,CPUTime,MaxVMSize,MaxRSS,AveRSS
+source .bashrc
+sreport
 """
 
 
@@ -97,7 +100,8 @@ def faidxScript():
 
 module load samtools/1.9
 samtools faidx $1
-sacct -j $SLURM_JOB_ID.batch --format=JobName,JobID,TimeLimit,Elapsed,Start,End,CPUTime,MaxVMSize,MaxRSS,AveRSS
+source .bashrc
+sreport
 """
 
 
@@ -127,7 +131,8 @@ java -jar $EBROOTPICARD/picard.jar UpdateVcfSequenceDictionary \
     O=$4 \
     SEQUENCE_DICTIONARY=$3
 rm $2
-sacct -j $SLURM_JOB_ID.batch --format=JobName,JobID,TimeLimit,Elapsed,Start,End,CPUTime,MaxVMSize,MaxRSS,AveRSS
+source .bashrc
+sreport
 """
 
 
@@ -147,7 +152,8 @@ def picardIndexScript():
 module load picard/2.18.9
 java -jar $EBROOTPICARD/picard.jar CreateSequenceDictionary \
     REFERENCE=$1 OUTPUT=$1.dict
-sacct -j $SLURM_JOB_ID.batch --format=JobName,JobID,TimeLimit,Elapsed,Start,End,CPUTime,MaxVMSize,MaxRSS,AveRSS
+source .bashrc
+sreport
 """
 
 
@@ -164,5 +170,6 @@ def bwaIndexScript():
 
 module load bwa/0.7.17
 bwa index $1
-sacct -j $SLURM_JOB_ID.batch --format=JobName,JobID,TimeLimit,Elapsed,Start,End,CPUTime,MaxVMSize,MaxRSS,AveRSS
+source .bashrc
+sreport
 """
