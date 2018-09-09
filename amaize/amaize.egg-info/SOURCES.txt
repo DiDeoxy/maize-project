@@ -1,0 +1,8 @@
+README.md
+amaize/__init__.py
+amaize/jobs.py
+amaize/sbatch.py
+amaize.egg-info/PKG-INFO
+amaize.egg-info/SOURCES.txt
+amaize.egg-info/dependency_links.txt
+amaize.egg-info/top_level.txt
