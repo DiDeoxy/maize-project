@@ -3,19 +3,9 @@
 import argparse
 import itertools
 import os
-<<<<<<< HEAD:qc_reads/qc_and_trim.py
-import pathlib
-import subprocess
-import sys
-import tempfile
-
-import jobs
-from sbatch import fastqcScript, trimPEScript, trimSEScript
-=======
 import sys
 
 from amaize import jobs, sbatch
->>>>>>> 5605718e1bb242f0e71f1b44e86cf806fc14b438:qc_reads/qc_and_trim.py
 
 
 def baseParser(parser):
@@ -123,11 +113,7 @@ def parseCmdLine():
     return args
 
 
-<<<<<<< HEAD:qc_reads/qc_and_trim.py
-def fourTrimOut(trim, forward, reverse):
-=======
 def fourTrimOut(trimDir, forward, reverse):
->>>>>>> 5605718e1bb242f0e71f1b44e86cf806fc14b438:qc_reads/qc_and_trim.py
     """Create the four output file names for trimmomatic."""
     sampleF = forward.split(".fq.gz")[0]
     sampleR = reverse.split(".fq.gz")[0]
